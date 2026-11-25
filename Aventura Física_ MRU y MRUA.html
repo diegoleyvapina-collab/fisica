@@ -1,0 +1,231 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Aventura Física: MRU y MRUA</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#fff1cf;--ink:#2a1f4d;--panel:#fffaf0;--ac:#ff5a36;--ln:#2a1f4d}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c1536;--ink:#f6ecd0;--panel:#2b2250;--ln:#f6ecd0}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#1c1536;--ink:#f6ecd0;--panel:#2b2250;--ln:#f6ecd0}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
+#app{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+#hud{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;width:min(100vw,calc((100dvh - 140px)*16/9));padding:4px 8px;font:10px/1.6 "Press Start 2P",monospace}
+canvas{width:min(100vw,calc((100dvh - 140px)*16/9));height:auto;aspect-ratio:16/9;border:3px solid var(--ln);border-radius:8px;background:#6ec6ff;touch-action:none}
+#pad{display:none;gap:10px;width:min(100%,800px);padding:2px 12px}
+#pad button{flex:1;height:64px;font-size:22px;touch-action:none}#pad #bj{flex:1.7;font-size:15px}
+@media (pointer:coarse),(max-width:700px){#pad{display:flex}}
+.ov{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(20,10,50,.86);padding:max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));overflow:auto}
+.hide{display:none}
+.card{background:var(--panel);color:var(--ink);border:4px solid var(--ln);border-radius:14px;box-shadow:6px 6px 0 var(--ac);max-width:540px;width:100%;padding:18px;margin:auto}
+h1,h2{font-family:"Press Start 2P",monospace;font-size:clamp(13px,3.4vw,19px);line-height:1.6;margin:0 0 10px}
+h2{font-size:clamp(11px,2.8vw,14px)}
+label{display:block;font-weight:700;margin:10px 0 4px}
+input{width:100%;font:inherit;padding:11px;border:3px solid var(--ln);border-radius:8px;background:var(--bg);color:var(--ink)}
+.btn{font:800 16px system-ui,sans-serif;background:var(--ac);color:#fff;border:3px solid var(--ln);border-radius:10px;padding:12px 18px;cursor:pointer;box-shadow:0 4px 0 var(--ln)}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ln)}
+.ctl{background:#3b2f78;color:#fff}
+.opt{display:block;width:100%;text-align:left;font:700 16px system-ui,sans-serif;background:var(--bg);color:var(--ink);border:3px solid var(--ln);border-radius:10px;padding:12px;margin:8px 0;cursor:pointer}
+.opt.ok{background:#c8f3d6;color:#0b3d1d}.opt.no{background:#ffd3d8;color:#5a0b16;opacity:.8}
+.fm{font:700 15px ui-monospace,Menlo,monospace;background:var(--bg);border-left:6px solid var(--ac);padding:8px 10px;margin:8px 0}
+#qFb{margin:8px 0;line-height:1.5;font-weight:600}
+.res td{padding:4px 10px 4px 0;font-weight:700}.err{color:#d7263d;font-weight:700;min-height:1.3em}
+</style></head><body>
+<div id="app">
+<div id="hud"><span id="hN"></span><span id="hL"></span><span id="hC"></span><span id="hS"></span></div>
+<canvas id="c" width="800" height="450" aria-label="Juego de plataformas"></canvas>
+<div id="pad"><button class="btn ctl" id="bl" aria-label="Izquierda">◀</button><button class="btn ctl" id="br" aria-label="Derecha">▶</button><button class="btn" id="bj">SALTAR</button></div>
+</div>
+
+<div id="reg" class="ov"><div class="card">
+<h1>Aventura Física</h1><p>Recorre 10 mundos, salta obstáculos y resuelve problemas de MRU y MRUA para abrir cada puerta.</p>
+<label for="iN">Nombre del estudiante</label><input id="iN" maxlength="40" autocomplete="off">
+<label for="iG">Grupo</label><input id="iG" maxlength="10" autocomplete="off">
+<label for="iL">Número de lista</label><input id="iL" type="number" min="1" max="99" inputmode="numeric">
+<p class="err" id="err"></p>
+<button class="btn" id="go">Comenzar aventura</button>
+<p style="font-size:13px;opacity:.8">Teclado: ← → para moverte y barra espaciadora para saltar. En el celular usa los botones.</p>
+</div></div>
+
+<div id="modal" class="ov hide"><div class="card">
+<h2 id="qH"></h2><div class="fm" id="qF"></div><p id="qQ" style="font-weight:700;font-size:17px;line-height:1.45"></p>
+<div id="qO"></div><div id="qFb" role="status" aria-live="polite"></div>
+<button class="btn hide" id="qNext">Abrir la puerta</button>
+</div></div>
+
+<div id="end" class="ov hide"><div class="card">
+<h1>Resultados</h1>
+<table class="res"><tr><td>Estudiante</td><td id="rN"></td></tr><tr><td>Grupo</td><td id="rG"></td></tr><tr><td>Número de lista</td><td id="rL"></td></tr><tr><td>Niveles completados</td><td id="rD"></td></tr><tr><td>Respuestas correctas</td><td id="rO"></td></tr><tr><td>Respuestas incorrectas</td><td id="rB"></td></tr><tr><td>Calificación final</td><td id="rS" style="font-size:22px"></td></tr></table>
+<p id="rM" style="font-weight:800;font-size:17px"></p>
+<button class="btn" id="again">Volver a jugar</button>
+</div></div>
+
+<script>
+const $=id=>document.getElementById(id),cv=$('c'),g=cv.getContext('2d'),W=800,H=450,GY=386;
+const S={name:'',grp:'',num:'',lvl:0,ok:0,bad:0,coins:0,done:0,tr:false};
+const NM=['El bosque de la velocidad','Las plataformas del movimiento','El puente de la aceleración','La montaña de los obstáculos','El desierto del movimiento','La cueva de la aceleración','El castillo de la Física','El mundo de los saltos','La fortaleza del conocimiento','El castillo final'];
+// [cielo arriba, cielo abajo, suelo, pasto, fondo]
+const TH=[['#6ec6ff','#d8f3ff','#7a4a21','#3fae49','#4ea85a'],['#ffb36b','#ffe3b0','#8a5a2b','#e0a43a','#d98a3d'],['#9ad0ff','#fff2c2','#5b6b7a','#53c0a8','#6aa5c9'],['#8fa8ff','#e6ddff','#6b5a7a','#9ad06b','#7a6fc0'],['#ffd27a','#fff0c2','#c99a4a','#f2cf7a','#e0a85a'],['#1b1536','#3a2a63','#3b3350','#6b5aa0','#2b2250'],['#2a1f4d','#5a3a7a','#6a6a7a','#a0a0b4','#3a3060'],['#ff9ec8','#ffe0f0','#8a4a6a','#f06aa0','#e07ab0'],['#21304f','#4a3a6a','#5a4a4a','#b08a5a','#352a55'],['#2a0f1f','#7a2a3a','#4a3a3a','#d05a3a','#3a1a2a']];
+// En cada pregunta la primera opción es la correcta (se mezclan al mostrarlas)
+const Q=[
+{q:'¿Qué característica tiene un movimiento rectilíneo uniforme (MRU)?',o:['Velocidad constante y aceleración igual a cero','La velocidad aumenta en cada segundo','La aceleración es constante y distinta de cero','El cuerpo permanece siempre en reposo'],f:'d = v × t',e:'En el MRU el cuerpo recorre distancias iguales en tiempos iguales: la velocidad no cambia, por eso la aceleración es 0 m/s².'},
+{q:'Un corredor avanza 120 m en 20 s con velocidad constante. ¿Qué distancia recorrerá en 50 s?',o:['300 m','240 m','360 m','600 m'],f:'v = d / t     d = v × t',e:'Primero v = 120 m / 20 s = 6 m/s. Después d = 6 m/s × 50 s = 300 m.'},
+{q:'En un movimiento rectilíneo uniformemente acelerado (MRUA), ¿qué ocurre con la velocidad?',o:['Cambia la misma cantidad en cada intervalo de tiempo igual','Se mantiene constante','Siempre disminuye hasta cero','Es igual a la distancia recorrida'],f:'a = (vf − vi) / t',e:'En el MRUA la aceleración es constante, así que la velocidad aumenta (o disminuye) la misma cantidad cada segundo.'},
+{q:'Un ciclista recorre 150 m en 30 s con velocidad constante. ¿Cuál es su velocidad?',o:['5 m/s','4 m/s','30 m/s','180 m/s'],f:'v = d / t',e:'v = d / t = 150 m / 30 s = 5 m/s.'},
+{q:'Un tren se mueve a 25 m/s constantes. ¿Cuánto tarda en recorrer 1000 m?',o:['40 s','25 s','4 s','0.04 s'],f:'t = d / v',e:'t = d / v = 1000 m / 25 m/s = 40 s.'},
+{q:'Un auto parte del reposo con aceleración de 3 m/s². ¿Qué velocidad tiene a los 6 s?',o:['18 m/s','9 m/s','2 m/s','36 m/s'],f:'vf = vi + a × t',e:'Parte del reposo, así que vi = 0. vf = 0 + 3 m/s² × 6 s = 18 m/s.'},
+{q:'Una moto lleva una velocidad inicial de 10 m/s y acelera a 2 m/s² durante 5 s. ¿Cuál es su velocidad final?',o:['20 m/s','15 m/s','25 m/s','100 m/s'],f:'vf = vi + a × t',e:'vf = 10 m/s + 2 m/s² × 5 s = 10 + 10 = 20 m/s.'},
+{q:'La velocidad de un objeto cambia de 4 m/s a 24 m/s en 5 s. ¿Cuál es su aceleración?',o:['4 m/s²','5 m/s²','20 m/s²','100 m/s²'],f:'a = (vf − vi) / t',e:'a = (24 − 4) m/s / 5 s = 20 / 5 = 4 m/s².'},
+{q:'Un auto parte del reposo con a = 2 m/s² durante 10 s y luego mantiene esa velocidad 5 s más. ¿Qué distancia total recorre?',o:['200 m','100 m','150 m','300 m'],f:'d = vi·t + ½·a·t²     d = v × t',e:'Tramo 1: d = ½ × 2 × 10² = 100 m y vf = 2 × 10 = 20 m/s. Tramo 2: d = 20 m/s × 5 s = 100 m. Total: 200 m.'},
+{q:'Un auto va a 20 m/s y frena con aceleración de −4 m/s² hasta detenerse. ¿Qué distancia recorre al frenar?',o:['50 m','100 m','80 m','25 m'],f:'a = (vf − vi)/t     d = vi·t + ½·a·t²',e:'Tiempo: t = (0 − 20) / (−4) = 5 s. Distancia: d = 20 × 5 + ½ × (−4) × 5² = 100 − 50 = 50 m.'}];
+
+function rnd(s){return()=>(s=s*16807%2147483647)/2147483647}
+const hit=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+function build(L){
+ const r=rnd(L*977+13),len=2000+L*140,A=[],v={len,S:A,M:[],E:[],C:[],Hz:[],P:[],gaps:[],star:null,flag:null,done:0,t:0};
+ const add=(x,y,w,h,o)=>{const s=Object.assign({x,y,w,h},o);A.push(s);return s};
+ const coin=(x,y)=>v.C.push({x,y,g:0});
+ let x=300,i=0,prev=0;const fi=Math.floor((len/2-300)/220);
+ while(x<len-460){
+  let t=Math.floor(r()*(L<2?5:7));
+  if(prev===1||prev===6)t=[0,3,4][Math.floor(r()*3)];
+  if(i===2)t=3;if(i===fi)t=9;
+  if(t===0){const sp=.9+L*.12;v.E.push({x:x+40,y:GY-24,w:28,h:24,a:x+30,b:x+190,vx:sp,d:0});if(L>=4)v.E.push({x:x+150,y:GY-24,w:28,h:24,a:x+30,b:x+190,vx:-sp,d:0})}
+  else if(t===1){const gw=64+Math.round(r()*16)+Math.round(L*3.5);v.gaps.push([x+50,x+50+gw]);for(let k=1;k<4;k++)coin(x+50+gw*k/4,GY-70-(k===2?22:0))}
+  else if(t===2){const ph=64+(L>6?32:0);add(x+80,GY-ph,48,ph,{pipe:1});coin(x+104,GY-ph-26)}
+  else if(t===3){add(x+40,GY-100,96,16,{pl:1});for(let k=0;k<3;k++)coin(x+60+k*28,GY-124);if(i===2)v.star={x:x+88,y:GY-152,got:0}}
+  else if(t===4){for(let k=0;k<3;k++)add(x+50+k*32,GY-112,32,32,{blk:1,used:0,b:0})}
+  else if(t===5){v.Hz.push({x:x+90,y:GY-26,w:28,h:26});coin(x+104,GY-80)}
+  else if(t===6){const gw=150;v.gaps.push([x+30,x+30+gw]);add(x+30,GY,64,14,{mv:1,vx:1.1+L*.05,x0:x+30,x1:x+30+gw-64,dx:0,pl:1})}
+  else if(t===9)v.flag={x:x+100,y:GY-96,on:0};
+  prev=t;i++;x+=220;
+ }
+ let cur=0;v.gaps.forEach(([a,b])=>{add(cur,GY,a-cur,H-GY,{gr:1});cur=b});add(cur,GY,len-cur,H-GY,{gr:1});
+ A.filter(s=>s.mv).forEach(m=>v.M.push(m));
+ v.door={x:len-100,y:GY-64,w:44,h:64,open:0};
+ return v;
+}
+let lv,P,cp,cam=0,st='reg',fr=0,bn=0,adv=0;const K={},pops=[];
+function load(L){lv=build(L);P={x:60,y:GY-32,w:22,h:32,vx:0,vy:0,on:1,d:1,inv:60,star:0,coy:0,buf:0,jh:0,ride:null};cp={x:60};cam=0;bn=170;setHud()}
+function setHud(){$('hN').textContent=S.name;$('hL').textContent='Nivel '+(S.lvl+1)+'/10';$('hC').textContent='🪙 '+S.coins;$('hS').textContent='✔ '+S.ok+'  ✘ '+S.bad}
+function respawn(){P.x=cp.x;P.y=GY-P.h;P.vx=P.vy=0;P.inv=100;P.ride=null}
+function hurt(){if(!P.inv&&!P.star)respawn()}
+function upd(){
+ const p=P,v=lv;
+ v.M.forEach(m=>{const o=m.x;m.x+=m.vx;if(m.x<m.x0||m.x>m.x1){m.x=Math.min(Math.max(m.x,m.x0),m.x1);m.vx*=-1}m.dx=m.x-o});
+ const l=K.ArrowLeft||K.KeyA,r=K.ArrowRight||K.KeyD,j=K.Space||K.ArrowUp||K.KeyW,ax=p.on?.4:.28;
+ if(r&&!l){p.vx=Math.min(p.vx+ax,3.7);p.d=1}else if(l&&!r){p.vx=Math.max(p.vx-ax,-3.7);p.d=-1}else p.vx*=p.on?.78:.95;
+ if(Math.abs(p.vx)<.05)p.vx=0;
+ if(p.ride)p.x+=p.ride.dx;
+ p.x+=p.vx;
+ for(const s of v.S)if(hit(p,s)){if(p.vx>0||(p.ride&&p.ride.dx>0&&p.x<s.x))p.x=s.x-p.w;else p.x=s.x+s.w;p.vx=0}
+ p.x=Math.min(Math.max(p.x,0),v.len-p.w);
+ if(j&&!p.jh)p.buf=7;p.jh=j;
+ p.coy=p.on?7:p.coy-1;
+ if(p.buf>0&&p.coy>0){p.vy=-11.6;p.buf=0;p.coy=0;p.on=0}p.buf--;
+ if(!j&&p.vy<-4)p.vy=-4;
+ p.vy=Math.min(p.vy+.55,13);p.y+=p.vy;p.on=0;p.ride=null;
+ for(const s of v.S)if(hit(p,s)){
+  if(p.vy>0){p.y=s.y-p.h;p.vy=0;p.on=1;if(s.mv)p.ride=s}
+  else if(p.vy<0){p.y=s.y+s.h;p.vy=0;if(s.blk&&!s.used){s.used=1;s.b=8;S.coins++;pops.push({x:s.x+16,y:s.y,t:30});setHud()}}}
+ if(p.inv>0)p.inv--;if(p.star>0)p.star--;
+ const hb={x:p.x+3,y:p.y+3,w:p.w-6,h:p.h-3};
+ v.E.forEach(e=>{if(e.dead){if(e.d>0)e.d--;return}
+  e.x+=e.vx;if(e.x<e.a||e.x+e.w>e.b)e.vx*=-1;
+  if(hit(hb,e)){if(p.star>0||(p.vy>1&&p.y+p.h-e.y<20)){e.dead=1;e.d=30;if(!p.star)p.vy=-7.5}else hurt()}});
+ v.Hz.forEach(h=>{if(hit(hb,h))hurt()});
+ v.C.forEach(c=>{if(!c.g&&Math.abs(c.x-(p.x+11))<18&&Math.abs(c.y-(p.y+16))<22){c.g=1;S.coins++;setHud()}});
+ if(v.star&&!v.star.got&&Math.abs(v.star.x-(p.x+11))<22&&Math.abs(v.star.y-(p.y+16))<26){v.star.got=1;p.star=420;S.coins+=5;setHud()}
+ if(v.flag&&!v.flag.on&&hit(p,{x:v.flag.x-8,y:v.flag.y,w:20,h:96})){v.flag.on=1;cp={x:v.flag.x-30}}
+ if(p.y>H+60)respawn();
+ if(!v.done&&hit(p,v.door))openQ();
+ if(v.done){v.t++;v.door.open=Math.min(1,v.door.open+.04);if(v.t===55)next()}
+ cam+=(Math.min(Math.max(p.x-W*.4,0),v.len-W)-cam)*.15;
+ if(bn>0)bn--;
+}
+function next(){S.lvl++;if(S.lvl>=10)finish();else load(S.lvl)}
+function sh(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function openQ(){
+ st='q';for(const k in K)delete K[k];S.tr=false;const q=Q[S.lvl],box=$('qO');
+ $('qH').textContent='Nivel '+(S.lvl+1)+': '+NM[S.lvl];$('qF').textContent=q.f;$('qQ').textContent=q.q;
+ box.innerHTML='';$('qFb').textContent='';$('qNext').classList.add('hide');
+ sh(q.o.map((t,i)=>({t,c:i===0}))).forEach(o=>{const b=document.createElement('button');b.className='opt';b.textContent=o.t;b.onclick=()=>ans(b,o,q);box.appendChild(b)});
+ $('modal').classList.remove('hide');
+}
+function ans(b,o,q){
+ if(o.c){b.classList.add('ok');if(!S.tr)S.ok++;[...$('qO').children].forEach(x=>x.disabled=true);
+  $('qFb').textContent='¡Correcto! '+q.e+(S.tr?' Como fallaste antes, esta respuesta no suma punto.':' +1 punto.');$('qNext').classList.remove('hide')}
+ else{b.classList.add('no');b.disabled=true;if(!S.tr){S.tr=true;S.bad++}$('qFb').textContent='Incorrecto. '+q.e+' Elige otra opción para continuar.'}
+ setHud();save();
+}
+$('qNext').onclick=()=>{$('modal').classList.add('hide');S.done++;lv.done=1;lv.t=0;st='play'};
+function save(){try{sessionStorage.setItem('fisica',JSON.stringify(S))}catch(e){}}
+function finish(){
+ st='end';save();const c=S.ok;
+ $('rN').textContent=S.name;$('rG').textContent=S.grp;$('rL').textContent=S.num;$('rD').textContent=S.done+' de 10';$('rO').textContent=c;$('rB').textContent=S.bad;$('rS').textContent=c+'/10';
+ $('rM').textContent=c===10?'¡Excelente! Eres un maestro de la Física.':c>=8?'¡Muy bien! Tienes un gran conocimiento.':c>=6?'¡Buen trabajo! Sigue practicando.':'Sigue aprendiendo, puedes volver a intentarlo.';
+ $('end').classList.remove('hide');
+}
+$('go').onclick=()=>{
+ const n=$('iN').value.trim(),gr=$('iG').value.trim(),nu=$('iL').value.trim();
+ if(!n||!gr||!nu){$('err').textContent='Completa nombre, grupo y número de lista.';return}
+ S.name=n;S.grp=gr;S.num=nu;$('reg').classList.add('hide');start();
+};
+function start(){Object.assign(S,{lvl:0,ok:0,bad:0,coins:0,done:0,tr:false});load(0);st='play'}
+$('again').onclick=()=>{$('end').classList.add('hide');start()};
+
+addEventListener('keydown',e=>{if(st!=='play')return;if(['ArrowLeft','ArrowRight','ArrowUp','Space'].includes(e.code))e.preventDefault();K[e.code]=1});
+addEventListener('keyup',e=>{delete K[e.code]});
+addEventListener('blur',()=>{for(const k in K)delete K[k]});
+[['bl','ArrowLeft'],['br','ArrowRight'],['bj','Space']].forEach(([id,k])=>{const b=$(id),on=e=>{e.preventDefault();K[k]=1},off=()=>{delete K[k]};
+ b.addEventListener('pointerdown',on);['pointerup','pointerleave','pointercancel'].forEach(t=>b.addEventListener(t,off));b.addEventListener('contextmenu',e=>e.preventDefault())});
+
+// ---------- dibujo ----------
+function star5(cx,cy,R){g.beginPath();for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5,r=k%2?R*.45:R;g.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r)}g.closePath();g.fill()}
+function drawP(){
+ const p=P;if(p.inv>0&&fr%8<4)return;
+ const moving=Math.abs(p.vx)>.3&&p.on,sw=moving?Math.sin(fr/3)*3:0,x=Math.round(p.x),y=Math.round(p.y);
+ g.save();if(p.star>0){g.shadowColor=fr%10<5?'#ffe600':'#ff4fd8';g.shadowBlur=14}
+ g.fillStyle='#3a2a63';g.fillRect(x+2,y+24+(sw>0?-1:0),9,8-(sw>0?1:0));g.fillRect(x+11,y+24+(sw<0?-1:0),9,8-(sw<0?1:0));
+ g.fillStyle='#1fa5a0';g.fillRect(x+2,y+13,18,12);g.fillStyle='#ffd23f';g.fillRect(x+2,y+21,18,3);
+ g.fillStyle='#f2c28b';g.fillRect(x+3,y+3,16,11);
+ g.fillStyle='#ff7a1a';g.fillRect(x+1,y,20,6);g.fillRect(p.d>0?x+14:x-2,y+4,8,3);
+ g.fillStyle='#2a1f4d';g.fillRect(p.d>0?x+13:x+6,y+7,3,3);
+ g.fillStyle='#e2543a';g.fillRect(p.d>0?x-1:x+18,y+14,4,8);
+ g.restore();
+}
+function draw(){
+ if(!lv)return;const L=S.lvl,th=TH[L],night=L===5||L>=6&&L!==7,castle=L===6||L>=8;
+ const gr=g.createLinearGradient(0,0,0,H);gr.addColorStop(0,th[0]);gr.addColorStop(1,th[1]);g.fillStyle=gr;g.fillRect(0,0,W,H);
+ if(night){g.fillStyle='#fff';for(let k=0;k<40;k++){g.globalAlpha=.4+.6*Math.abs(Math.sin(fr/30+k));g.fillRect((k*97)%W,(k*53)%230,2,2)}g.globalAlpha=1}
+ else{g.fillStyle='rgba(255,255,255,.85)';for(let k=0;k<6;k++){const cx=((k*230-cam*.2)%1380+1380)%1380-150,cy=50+(k%3)*40;g.beginPath();g.ellipse(cx,cy,40,16,0,0,7);g.fill();g.beginPath();g.ellipse(cx+26,cy-8,28,14,0,0,7);g.fill()}}
+ if(L===5){g.fillStyle='#3b3350';for(let k=0;k<14;k++){const x=((k*90-cam*.5)%1260+1260)%1260-60;g.beginPath();g.moveTo(x,0);g.lineTo(x+36,0);g.lineTo(x+18,50+(k%3)*30);g.fill()}}
+ g.fillStyle=th[4];
+ for(let k=0;k<7;k++){const cx=((k*270-cam*.4)%1890+1890)%1890-120;
+  if(castle){const h=110+(k%3)*40;g.fillRect(cx,GY-h,64,h);for(let m=0;m<4;m++)g.fillRect(cx+m*18,GY-h-10,10,10)}
+  else{g.beginPath();g.arc(cx,GY,90+(k%3)*30,Math.PI,0);g.fill()}}
+ g.save();g.translate(-Math.round(cam),0);
+ lv.S.forEach(s=>{if(s.x>cam+W||s.x+s.w<cam)return;
+  if(s.gr){g.fillStyle=th[2];g.fillRect(s.x,s.y,s.w,s.h);g.fillStyle=th[3];g.fillRect(s.x,s.y,s.w,10);g.fillStyle='rgba(0,0,0,.18)';for(let x=s.x-(s.x%32)+32;x<s.x+s.w;x+=32)g.fillRect(x,s.y+10,2,s.h)}
+  else if(s.pl){g.fillStyle=th[2];g.fillRect(s.x,s.y,s.w,s.h);g.fillStyle=th[3];g.fillRect(s.x,s.y,s.w,5);g.fillStyle='rgba(0,0,0,.2)';for(let x=s.x+16;x<s.x+s.w;x+=16)g.fillRect(x,s.y+5,2,s.h)}
+  else if(s.pipe){g.fillStyle='#22a84a';g.fillRect(s.x,s.y,s.w,s.h);g.fillStyle='#7be08f';g.fillRect(s.x+6,s.y,6,s.h);g.fillStyle='#168a3a';g.fillRect(s.x-4,s.y,s.w+8,14);g.fillStyle='#7be08f';g.fillRect(s.x,s.y+2,6,10)}
+  else if(s.blk){const o=s.b>0?(s.b--,-s.b):0;g.fillStyle=s.used?'#8a6a4a':'#ffc21a';g.fillRect(s.x,s.y+o,32,32);g.strokeStyle='#7a4a00';g.lineWidth=3;g.strokeRect(s.x+1.5,s.y+o+1.5,29,29);
+   if(!s.used){g.fillStyle='#7a4a00';g.font='bold 20px sans-serif';g.textAlign='center';g.fillText('?',s.x+16,s.y+o+24)}}});
+ const f=lv.flag;if(f){g.fillStyle='#ccc';g.fillRect(f.x,f.y,4,96);g.fillStyle=f.on?'#2ecc71':'#e0e0e0';g.beginPath();g.moveTo(f.x+4,f.y+4);g.lineTo(f.x+40,f.y+16);g.lineTo(f.x+4,f.y+28);g.fill();g.fillStyle='#ffd23f';g.beginPath();g.arc(f.x+2,f.y,5,0,7);g.fill()}
+ const d=lv.door;g.fillStyle='#4a2a12';g.fillRect(d.x-4,d.y-6,d.w+8,d.h+6);g.fillStyle=d.open>=1?'#120a24':'#9a5a22';g.fillRect(d.x,d.y,d.w,d.h);
+ if(d.open<1){g.fillStyle='#7a4616';g.fillRect(d.x+4,d.y+4,d.w-8,d.h-8);g.fillStyle='#ffd23f';g.fillRect(d.x+d.w/2-6,d.y+28,12,10);g.strokeStyle='#ffd23f';g.lineWidth=3;g.beginPath();g.arc(d.x+d.w/2,d.y+28,5,Math.PI,0);g.stroke()}
+ else{g.fillStyle='#ffe98a';g.fillRect(d.x+14,d.y+22,16,26)}
+ lv.C.forEach(c=>{if(c.g)return;const w=Math.abs(Math.cos(fr/10+c.x))*6+1;g.fillStyle='#ffc21a';g.beginPath();g.ellipse(c.x,c.y,w,7,0,0,7);g.fill();g.strokeStyle='#a86a00';g.lineWidth=2;g.stroke()});
+ const sr=lv.star;if(sr&&!sr.got){g.fillStyle='#ffe600';g.shadowColor='#ff9f1c';g.shadowBlur=12;star5(sr.x,sr.y+Math.sin(fr/12)*4,14);g.shadowBlur=0}
+ lv.Hz.forEach(h=>{g.fillStyle='#f3e6c8';g.fillRect(h.x+9,h.y+14,10,12);g.fillStyle='#c8202f';g.beginPath();g.arc(h.x+14,h.y+15,14,Math.PI,0);g.fill();g.fillStyle='#2a1f4d';for(let k=0;k<3;k++){g.beginPath();g.moveTo(h.x+3+k*9,h.y+3);g.lineTo(h.x+7+k*9,h.y-4);g.lineTo(h.x+11+k*9,h.y+3);g.fill()}g.fillStyle='#fff';g.fillRect(h.x+7,h.y+8,5,5);g.fillRect(h.x+16,h.y+8,5,5)});
+ lv.E.forEach(e=>{if(e.dead&&e.d<=0)return;const sq=e.dead?.35:1,hh=e.h*sq,y=e.y+e.h-hh;
+  g.fillStyle='#9b5a2b';g.beginPath();g.ellipse(e.x+14,y+hh*.5,14,hh*.5,0,0,7);g.fill();
+  if(!e.dead){const s=Math.floor(fr/8)%2;g.fillStyle='#4a2a12';g.fillRect(e.x+(s?2:6),e.y+18,9,6);g.fillRect(e.x+(s?17:13),e.y+18,9,6);g.fillStyle='#fff';g.fillRect(e.x+6,e.y+7,6,6);g.fillRect(e.x+16,e.y+7,6,6);g.fillStyle='#000';g.fillRect(e.x+(e.vx>0?9:6),e.y+9,3,3);g.fillRect(e.x+(e.vx>0?19:16),e.y+9,3,3)}});
+ drawP();
+ g.fillStyle='#fff';g.font='bold 14px sans-serif';g.textAlign='center';
+ for(let k=pops.length-1;k>=0;k--){const q=pops[k];g.globalAlpha=q.t/30;g.fillText('+1',q.x,q.y-(30-q.t));g.globalAlpha=1;if(--q.t<=0)pops.splice(k,1)}
+ g.restore();
+ if(bn>0&&st==='play'){g.globalAlpha=Math.min(1,bn/40);g.fillStyle='rgba(20,10,50,.78)';g.fillRect(60,150,680,110);g.fillStyle='#ffd23f';g.textAlign='center';g.font='16px "Press Start 2P",monospace';g.fillText('Nivel '+(S.lvl+1),W/2,190);g.fillStyle='#fff';g.font='13px "Press Start 2P",monospace';g.fillText(NM[S.lvl],W/2,230);g.globalAlpha=1}
+}
+let last=0,acc=0;
+function loop(t){requestAnimationFrame(loop);acc+=Math.min(t-last,100);last=t;while(acc>=16.67){acc-=16.67;if(st==='play')upd();fr++}draw()}
+lv=build(0);P={x:60,y:GY-32,w:22,h:32,vx:0,vy:0,on:1,d:1,inv:0,star:0};setHud();requestAnimationFrame(loop);
+</script></body></html>
